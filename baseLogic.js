@@ -28,23 +28,17 @@ class Player{
         console.log(`${this.name}'s active card:\n${this.activeCard.name}, ${this.activeCard.type}, ${this.activeCard.attack} dmg, ${this.activeCard.hp} hp, ${this.activeCard.energy} energy`);
     }
 
-    drawCards(numOfCards){
-        this.cards=[];
-        let passed=false;
-        do{
-            for(let i=0;i<numOfCards;i++){
-                const randomIndex = Math.floor(Math.random() * availableCards.length);
-                const card = availableCards[randomIndex];
-                if (card.energy <= 1) {
-                    passed = true; // Set passed to true if card's energy is <= 1
-                    i=0;
-                    this.cards.length=0;
-                }
-                this.cards.push(card);
-                
-                
-            }
-        }while(!passed)
+    drawCards(numOfCards) {
+        this.cards = [];
+        for (let i = 0; i < numOfCards; i++) {
+            const randomIndex = Math.floor(Math.random() * availableCards.length);
+            const card = availableCards[randomIndex];
+            this.cards.push(card);
+        }
+        // Ensure at least one card can be played
+        if (!this.cards.some(card => card.hp > 0 && card.energy <= this.energy)) {
+            console.log(`${this.name} has drawn cards but none can be played!`);
+        }
     }
 
     printDeck(){
@@ -65,7 +59,7 @@ const availableCards = [
     new Card("fire","Magmar",60,70,3),
 ];
 
-function setActiveCard(player,cardIndex,isAI=false){
+function setActiveCard(player,cardIndex,isAI){
     if(cardIndex==-1){
         console.log(`Passed without set card`);
         return;
@@ -77,14 +71,14 @@ function setActiveCard(player,cardIndex,isAI=false){
 
     }else{
         if(!isAI)console.log("Not Enough Energy or Invalid Card");
-        return null;
     }
 }
 
-function setActiveCardFromDeck(player){
-    if(!player.activeCard){
-        for(let i=0;i<player.cards.length;i++){
-            if (player.cards[i] !== null && setActiveCard(player, i, true)) {
+function setActiveCardFromDeck(player,isAI){
+    if (!player.activeCard && isAI) {
+        for (let i = 0; i < player.cards.length; i++) {
+            if (player.cards[i] && player.cards[i].hp > 0 && player.cards[i].energy <= player.energy) {
+                setActiveCard(player, i,isAI);
                 break;
             }
         }
@@ -92,39 +86,67 @@ function setActiveCardFromDeck(player){
 }
 
 function showCardsInArray(cards){
-    for(let i=0;i<cards.length;i++){
-        if(cards[i]!=null){
-            console.log(`Choose active card:
-                Enter ${i+1} for ${cards[i].name} 
-                energy: ${cards[i].energy} 
-                attack: ${cards[i].attack} 
-                hp: ${cards[i].hp}`);
+    console.log(`Choose active card:`);
+    cards.forEach((card, index) => {
+        if (card) {
+            console.log(`Enter ${index + 1} for ${card.name}\nenergy: ${card.energy}\nattack: ${card.attack}\nhp: ${card.hp}`);
         }
-    }
-    console.log(`Enter 0 to continue without setting active pokemon`);
+    });
+    console.log(`Enter 0 to continue without setting active card `);
 }
 
 function newActiveCard(player){
     showCardsInArray(player.cards);
     const userChoice = parseInt(prompt("Choose card as index:"))-1;
+    if (isNaN(userChoice) || userChoice < -1 || userChoice >= player.cards.length) {
+        console.log("Invalid choice. Please select a valid card index.");
+        return;
+    }
     setActiveCard(player, userChoice);
 }
 
 function attackTo(attacker,defender,isAI){
-
+    //console.log(`attack fun worked for ${attacker.name}`);
     if(attacker.activeCard && defender.activeCard){
         defender.activeCard.hp-=attacker.activeCard.attack;
-        console.log(`${attacker.name}'s ${attacker.activeCard.name} delivered ${attacker.activeCard.attack} dmg to ${defender.name}'s ${defender.activeCard.name}`);
+        console.log(`${attacker.name}'s ${attacker.activeCard.name} delivered ${attacker.activeCard.attack} dmg to ${defender.name}'s ${defender.activeCard.name}
+            ${defender.name}'s ${defender.activeCard.name} has ${defender.activeCard.hp} hp`);
 
         if(defender.activeCard.hp<=0){
             console.log(`${defender.name}'s ${defender.activeCard.name} is dead`)
             defender.activeCard=null;
     
-            if(isAI){setActiveCardFromDeck(defender);}
-            else{newActiveCard(defender)};
+            if (isAI) {
+                setActiveCardFromDeck(defender, true);
+            } else {
+                newActiveCard(defender);
+            }
 
             //defender.cards[activeCardIndex]=null;
 
+        }
+    }
+    else if(attacker.activeCard && !defender.activeCard){
+        defender.hp -= attacker.activeCard.attack;
+        console.log(`${attacker.name}'s ${attacker.activeCard.name} delivered ${attacker.activeCard.attack} dmg to ${defender.name}
+            ${defender.name} has ${defender.hp} hp`);
+
+        if(defender.hp<=0){
+            console.log(`${defender.name} is dead
+                ${attacker.name} win`);
+        }
+    }
+    else if(!attacker.activeCard && defender.activeCard){
+        defender.activeCard.hp -= 20;
+        console.log(`${attacker.name} delivered 20 dmg to ${defender.name}'s ${defender.activeCard.name}
+            ${defender.name}'s ${defender.activeCard.name} has ${defender.activeCard.hp} hp`);
+
+        if(defender.activeCard.hp<=0){
+            console.log(`${defender.name}'s ${defender.activeCard.name} is dead`)
+            defender.activeCard=null;
+    
+            if(isAI){setActiveCardFromDeck(defender,true);}
+            else{newActiveCard(defender)};
         }
     }
     else{
@@ -153,7 +175,7 @@ function gameLoop(){
 
     
 
-    while(player1.cards.some(card => card.hp > 0) && aiPlayer.cards.some(card => card.hp > 0)){
+    while(player1.cards.some(card => card.hp > 0) && aiPlayer.cards.some(card => card.hp > 0) && player1.hp>=0 && aiPlayer.hp>=0){
         console.log(`--- Turn ${turn} ---`);
 
         //if turn is 1 choose active cards for both
@@ -162,14 +184,10 @@ function gameLoop(){
             console.log(`AI Player +1 energy`);
             aiPlayer.energy++;
 
-            setActiveCardFromDeck(aiPlayer);
+            setActiveCardFromDeck(aiPlayer,true);
 
             if(aiPlayer.activeCard){
-                if(player1.activeCard){
-                    attackTo(aiPlayer,player1,true);
-                }else{
-                    //pass
-                }
+                attackTo(aiPlayer,player1,true);
             }
 
             player1Starts = !player1Starts;
@@ -180,13 +198,19 @@ function gameLoop(){
             console.log(`${playerName} +1 energy`);
             console.log(`${playerName} currentEnergy: ${player1.energy}`);
 
-            while(!player1.activeCard){
+            if(!player1.activeCard || player1.activeCard.hp<0){
                 newActiveCard(player1);
             }
+            
 
             player1.printActiveCard();
             console.log(`Enter 1 for Attack\n2 for Retreat\n3 for Pass Turn`);
             let actionChoice = parseInt(prompt("Choose action"));
+
+            if (isNaN(actionChoice) || actionChoice < 1 || actionChoice > 3) {
+                console.log("Invalid choice. Please select a valid action.");
+                continue;
+            }
 
             switch(actionChoice){
                 case 1:
@@ -195,12 +219,16 @@ function gameLoop(){
                     }
                     else{
                         console.log("Should wait opponent to set its active card for 1 turn");
-                        actionChoice=3
                     }
+                    actionChoice=3
                     break;
                 case 2:
                     //change card
-                    newActiveCard(player1);
+                    if (player1.cards.some(card => card.hp > 0 && card.energy <= player1.energy)) {
+                        newActiveCard(player1);
+                    } else {
+                        console.log("No valid cards to retreat to.");
+                    }
                     actionChoice=3;
                         break;
                 case 3:
@@ -215,10 +243,10 @@ function gameLoop(){
         turn++;
     }
 
-    if (aiPlayer.cards.some(card => card.activeCard && card.activeCard.hp > 0)) {
-        console.log("AI Player wins!");
-    } else {
+    if (aiPlayer.cards.every(card => card.hp <= 0)||aiPlayer.hp<=0) {
         console.log(`${playerName} wins!`);
+    } else {
+        console.log("AI Player wins!");
     }
 }
 
