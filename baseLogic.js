@@ -14,9 +14,10 @@ class Card{
 }
 
 class Player{
-    constructor(name,isAI=false,energy=0){
+    constructor(name,isAI=false,energy=0,hp=100){
         this.name=name;
         this.isAI=isAI;
+        this.hp=hp;
         this.energy=energy;
         this.activeCard=null;
         this.cards=[];
@@ -24,8 +25,7 @@ class Player{
 
     printActiveCard(){
         if(!this.activeCard) return;
-        console.log(`${this.name}'s active card:
-            ${this.activeCard.name}, ${this.activeCard.type}, ${this.activeCard.attack} dmg, ${this.activeCard.hp} hp, ${this.activeCard.energy} energy`);
+        console.log(`${this.name}'s active card:\n${this.activeCard.name}, ${this.activeCard.type}, ${this.activeCard.attack} dmg, ${this.activeCard.hp} hp, ${this.activeCard.energy} energy`);
     }
 
     drawCards(numOfCards){
@@ -66,13 +66,28 @@ const availableCards = [
 ];
 
 function setActiveCard(player,cardIndex,isAI=false){
-    if(player.energy>=player.cards[cardIndex].energy && player.cards[cardIndex].hp>0){
+    if(cardIndex==-1){
+        console.log(`Passed without set card`);
+        return;
+    }
+    if(player.cards[cardIndex] && player.energy>=player.cards[cardIndex].energy && player.cards[cardIndex].hp>0){
         player.activeCard= player.cards[cardIndex];
         player.energy -= player.cards[cardIndex].energy;
         console.log(`${player.name} set ${player.activeCard.name} as active`);
+
     }else{
-        if(!isAI)console.log("Not Enough Energy");
+        if(!isAI)console.log("Not Enough Energy or Invalid Card");
         return null;
+    }
+}
+
+function setActiveCardFromDeck(player){
+    if(!player.activeCard){
+        for(let i=0;i<player.cards.length;i++){
+            if (player.cards[i] !== null && setActiveCard(player, i, true)) {
+                break;
+            }
+        }
     }
 }
 
@@ -86,6 +101,7 @@ function showCardsInArray(cards){
                 hp: ${cards[i].hp}`);
         }
     }
+    console.log(`Enter 0 to continue without setting active pokemon`);
 }
 
 function newActiveCard(player){
@@ -94,16 +110,28 @@ function newActiveCard(player){
     setActiveCard(player, userChoice);
 }
 
-function attackTo(attacker,defender){
+function attackTo(attacker,defender,isAI){
+
+    if(attacker.activeCard && defender.activeCard){
         defender.activeCard.hp-=attacker.activeCard.attack;
         console.log(`${attacker.name}'s ${attacker.activeCard.name} delivered ${attacker.activeCard.attack} dmg to ${defender.name}'s ${defender.activeCard.name}`);
-        
-    if(defender.activeCard.hp<=0){
-        console.log(`${defender.name}'s ${defender.activeCard.name} is dead`)
-        defender.activeCard=null;
-        //defender.cards[activeCardIndex]=null;
-    }else{
-        console.log(`${defender.name}'s ${defender.activeCard.name} have ${defender.activeCard.hp} hp`)
+
+        if(defender.activeCard.hp<=0){
+            console.log(`${defender.name}'s ${defender.activeCard.name} is dead`)
+            defender.activeCard=null;
+    
+            if(isAI){setActiveCardFromDeck(defender);}
+            else{newActiveCard(defender)};
+
+            //defender.cards[activeCardIndex]=null;
+
+        }
+    }
+    else{
+        console.log("No active card");
+        defender.hp-=20;
+        console.log(`${attacker.name}' delivered 20 dmg to ${defender.name}
+            ${defender.name}'s current hp ${defender.hp}`);
     }
 }
 
@@ -134,16 +162,11 @@ function gameLoop(){
             console.log(`AI Player +1 energy`);
             aiPlayer.energy++;
 
-
-            if(!aiPlayer.activeCard){
-                for(let i=0;i<aiPlayer.cards.length;i++){
-                    if (setActiveCard(aiPlayer, i,true)) break;
-                }
-            }
+            setActiveCardFromDeck(aiPlayer);
 
             if(aiPlayer.activeCard){
                 if(player1.activeCard){
-                    attackTo(aiPlayer,player1);
+                    attackTo(aiPlayer,player1,true);
                 }else{
                     //pass
                 }
@@ -168,7 +191,7 @@ function gameLoop(){
             switch(actionChoice){
                 case 1:
                     if(turn!=1){
-                        attackTo(player1,aiPlayer);
+                        attackTo(player1,aiPlayer,false);
                     }
                     else{
                         console.log("Should wait opponent to set its active card for 1 turn");
